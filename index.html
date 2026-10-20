@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>شحن بضغطة</title>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EDF1F5;--surface:#fff;--ink:#0E1A2B;--mute:#5B6878;--line:#D5DCE5;--accent:#0E1A2B;--onaccent:#fff;--warn:#B45309;--ok:#0F7B4B;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B121C;--surface:#152133;--ink:#EAF0F7;--mute:#9AA8BA;--line:#27364C;--accent:#EAF0F7;--onaccent:#0E1A2B;--warn:#F59E0B;--ok:#34D399}}
+:root[data-theme="dark"]{--bg:#0B121C;--surface:#152133;--ink:#EAF0F7;--mute:#9AA8BA;--line:#27364C;--accent:#EAF0F7;--onaccent:#0E1A2B;--warn:#F59E0B;--ok:#34D399}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Readex Pro",Tahoma,"Segoe UI",sans-serif;line-height:1.6;min-height:100vh}
+main{max-width:480px;margin:0 auto;padding:24px 18px 40px}
+h1{font-size:28px;line-height:1.3;margin:8px 0 6px;font-weight:700}
+h2{font-size:22px;margin:4px 0 4px;font-weight:700}
+p{margin:0;color:var(--mute)}
+.screen{display:none}.screen.on{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.co{border:2px solid var(--line);background:var(--surface);border-radius:16px;padding:18px 10px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;font:inherit;color:var(--ink);cursor:pointer;font-weight:600;font-size:16px}
+.co:hover,.co:focus-visible{border-color:var(--c);outline:none}
+.logo{position:relative;overflow:hidden;width:64px;height:64px;border-radius:18px;background:var(--c);color:#fff;display:grid;place-items:center;font-weight:700;font-size:26px;font-family:Arial,sans-serif;letter-spacing:-1px}
+.logo.sm{width:40px;height:40px;border-radius:12px;font-size:17px}
+.logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:6px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.back{border:0;background:none;color:var(--ink);font:inherit;font-size:15px;cursor:pointer;padding:8px 0;margin-bottom:4px}
+.opt{width:100%;text-align:right;border:2px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:16px;margin-top:12px;font:inherit;cursor:pointer;display:block}
+.opt:hover,.opt:focus-visible{border-color:var(--c);outline:none}
+.opt b{display:block;font-size:18px}
+.opt span{color:var(--mute);font-size:14px}
+.btn{display:block;width:100%;text-align:center;border:0;border-radius:14px;padding:16px;font:inherit;font-weight:700;font-size:18px;background:var(--accent);color:var(--onaccent);cursor:pointer;text-decoration:none;margin-top:12px}
+.btn.alt{background:transparent;color:var(--ink);border:2px solid var(--line);font-weight:600;font-size:16px}
+.btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
+.digits{direction:ltr;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:18px 0 8px;min-height:56px}
+.grp{font-variant-numeric:tabular-nums;font-size:30px;font-weight:700;letter-spacing:3px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:6px 12px}
+.grp.empty{color:var(--line)}
+input.num{width:100%;font:inherit;font-size:22px;direction:ltr;text-align:center;padding:14px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);letter-spacing:2px}
+input.num:focus{outline:none;border-color:var(--c)}
+.status{margin-top:10px;font-size:15px;min-height:24px}
+.ok{color:var(--ok)}.bad{color:var(--warn)}
+.code{direction:ltr;text-align:center;font-size:18px;font-weight:600;background:var(--surface);border:2px dashed var(--line);border-radius:12px;padding:12px;margin-top:16px;word-break:break-all;font-variant-numeric:tabular-nums}
+.note{font-size:13px;margin-top:22px;text-align:center}
+@media (prefers-reduced-motion:no-preference){.screen.on{animation:in .18s ease-out}@keyframes in{from{opacity:0}to{opacity:1}}}
+</style>
+</head>
+<body>
+<main>
+
+<section id="s-home" class="screen on">
+  <h1>أهلاً بيك 👋</h1>
+  <p>صوّر كارت الشحن واتصل بالكود جاهز، من غير ما تكتب رقم واحد بإيدك. اختار شبكتك:</p>
+  <div class="grid" id="cos"></div>
+  <p class="note">نسخة تجريبية. الشعارات هنا بديلة لحد ما نحط الشعارات الرسمية.</p>
+</section>
+
+<section id="s-type" class="screen">
+  <button class="back" data-go="home">← رجوع</button>
+  <div class="top"><div class="logo sm" id="t-logo"></div><h2 id="t-name"></h2></div>
+  <p>عايز تشحن كارت الفكة إيه؟</p>
+  <div id="opts"></div>
+</section>
+
+<section id="s-scan" class="screen">
+  <button class="back" data-go="type">← رجوع</button>
+  <h2>صوّر الكارت</h2>
+  <p>قرّب الكاميرا من الرقم، وخلّي الإضاءة كويسة من غير لمعة.</p>
+  <label class="btn" for="cam" id="camBtn" tabindex="0">افتح الكاميرا</label>
+  <input id="cam" type="file" accept="image/*" capture="environment" hidden>
+  <div class="status" id="scanStatus"></div>
+  <button class="btn alt" id="manual">اكتب الرقم بنفسي</button>
+</section>
+
+<section id="s-review" class="screen">
+  <button class="back" data-go="scan">← رجوع</button>
+  <h2>راجع الرقم قبل الاتصال</h2>
+  <p>قارن الأرقام دي بالكارت. لو في رقم غلط، صلّحه من الخانة اللي تحت.</p>
+  <div class="digits" id="digits" aria-live="polite"></div>
+  <input class="num" id="num" inputmode="numeric" autocomplete="off" placeholder="رقم الكارت" aria-label="رقم الكارت">
+  <div class="status" id="rvStatus"></div>
+  <div class="code" id="full"></div>
+  <a class="btn" id="call" href="#" aria-disabled="true">اتصال</a>
+  <button class="btn alt" id="copy">انسخ الكود</button>
+</section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+const COS={
+ vf:{n:'فودافون',l:'V',c:'#E60000',o:{min:'*858*1*',net:'*858*2*',both:'*858*1*'}},
+ or:{n:'أورانج',l:'O',c:'#F26A00',o:{min:'#102*1*',net:'#102*2*',both:'#102*1*'}},
+ et:{n:'اتصالات',l:'e&',c:'#C8102E',o:{min:'*556*3*',net:'*556*2*',both:'*556*1*'}},
+ we:{n:'وي',l:'WE',c:'#5B2A86',o:{min:'*566*',net:'*599*',both:'*566*'}}
+};
+const OPTS=[['min','دقايق بس','لو الداتا مقفولة بيتحول الكارت لدقايق'],['net','نت بس','ميجابايتس للإنترنت'],['both','الاتنين مع بعض','وحدات للدقايق والنت']];
+const $=i=>document.getElementById(i);
+let co=null,pre='',digits='';
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+id));window.scrollTo(0,0)}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
+
+$('cos').innerHTML=Object.entries(COS).map(([k,v])=>`<button class="co" style="--c:${v.c}" data-k="${k}"><div class="logo" style="--c:${v.c}">${v.l}<img src="logos/${k}.png" alt="" onerror="this.remove()"></div>${v.n}</button>`).join('');
+$('cos').onclick=e=>{const b=e.target.closest('.co');if(!b)return;co=COS[b.dataset.k];
+ $('t-logo').innerHTML=co.l+'<img src="logos/'+b.dataset.k+'.png" alt="" onerror="this.remove()">';$('t-logo').style.setProperty('--c',co.c);$('t-name').textContent=co.n;
+ $('opts').innerHTML=OPTS.map(o=>`<button class="opt" style="--c:${co.c}" data-o="${o[0]}"><b>${o[1]}</b><span>${o[2]}</span></button>`).join('');
+ document.documentElement.style.setProperty('--c',co.c);show('type')};
+$('opts').onclick=e=>{const b=e.target.closest('.opt');if(!b)return;pre=co.o[b.dataset.o];
+ $('scanStatus').textContent='';show('scan')};
+
+$('camBtn').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('cam').click()}};
+$('manual').onclick=()=>toReview('');
+
+function toReview(d,msg){digits=d;$('num').value=d;render();$('rvStatus').textContent=msg||'';$('rvStatus').className='status'+(msg?' bad':'');show('review');if(!d)$('num').focus()}
+
+$('cam').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ const st=$('scanStatus');st.className='status';st.textContent='بقرا الرقم من الصورة...';
+ try{
+  if(typeof Tesseract==='undefined')throw 0;
+  const r=await Promise.race([
+   Tesseract.recognize(f,'eng',{tessedit_char_whitelist:'0123456789 '}),
+   new Promise((_,j)=>setTimeout(j,25000))]);
+  const t=(r.data.text||'').replace(/[^\d\s]/g,' ');
+  const m=(t.match(/\d(?:\s?\d){11,17}/g)||[]).map(s=>s.replace(/\s/g,'')).sort((a,b)=>Math.abs(a.length-14)-Math.abs(b.length-14));
+  if(!m.length)throw 0;
+  toReview(m[0]);
+ }catch(_){
+  toReview('','القراءة التلقائية مش شغالة في النسخة التجريبية دي. اكتب الرقم من الكارت وراجعه.');
+ }
+ e.target.value='';
+};
+
+function render(){
+ const g=digits.match(/.{1,4}/g)||[];
+ $('digits').innerHTML=g.length?g.map(x=>`<div class="grp">${x}</div>`).join(''):'<div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">00</div>';
+ const n=digits.length,s=$('rvStatus');
+ const full=pre+digits+'#';
+ $('full').textContent=n?full:pre+'...#';
+ const ok=n>=14&&n<=16;
+ $('call').setAttribute('aria-disabled',ok?'false':'true');
+ $('call').href=ok?'tel:'+encodeURIComponent(full):'#';
+ if(n&&n!==14){s.className='status bad';s.textContent=n<14?`الرقم ${n} خانة، ناقص ${14-n}. راجع الكارت.`:`الرقم ${n} خانة، أكتر من 14. راجع الكارت.`}
+ else if(n===14){s.className='status ok';s.textContent='14 خانة، تمام. اتأكد إنه مطابق للكارت.'}
+}
+$('num').oninput=e=>{digits=e.target.value.replace(/\D/g,'').slice(0,16);e.target.value=digits;render()};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(pre+digits+'#');$('copy').textContent='تم النسخ'}catch(_){$('copy').textContent='انسخ من الخانة اللي فوق'}setTimeout(()=>$('copy').textContent='انسخ الكود',1800)};
+render();
+</script>
+</body>
+</html>
