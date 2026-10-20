@@ -42,6 +42,10 @@ input.num:focus{outline:none;border-color:var(--c)}
 .ok{color:var(--ok)}.bad{color:var(--warn)}
 .code{direction:ltr;text-align:center;font-size:18px;font-weight:600;background:var(--surface);border:2px dashed var(--line);border-radius:12px;padding:12px;margin-top:16px;word-break:break-all;font-variant-numeric:tabular-nums}
 .note{font-size:13px;margin-top:22px;text-align:center}
+.vf{position:relative;margin-top:14px;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:3/4}
+.vf video{width:100%;height:100%;object-fit:cover;display:block}
+.vf .frame{position:absolute;left:6%;right:6%;top:42%;height:16%;border:3px solid #fff;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.55)}
+.vf .hint{position:absolute;left:0;right:0;top:61%;text-align:center;color:#fff;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.screen.on{animation:in .18s ease-out}@keyframes in{from{opacity:0}to{opacity:1}}}
 </style>
 </head>
@@ -66,7 +70,9 @@ input.num:focus{outline:none;border-color:var(--c)}
   <button class="back" data-go="type">← رجوع</button>
   <h2>صوّر الكارت</h2>
   <p>قرّب الكاميرا من الرقم، وخلّي الإضاءة كويسة من غير لمعة.</p>
-  <label class="btn" for="cam" id="camBtn" tabindex="0">افتح الكاميرا</label>
+  <div class="vf" id="vf" style="display:none"><video id="vid" playsinline muted></video><div class="frame"></div><div class="hint">حط الـ 16 رقم جوه المستطيل</div></div>
+  <button class="btn" id="startCam" style="display:none">افتح الكاميرا</button>
+  <label class="btn alt" for="cam" id="camBtn" tabindex="0">اختار صورة من الجهاز</label>
   <input id="cam" type="file" accept="image/*" capture="environment" hidden>
   <div class="status" id="scanStatus"></div>
   <button class="btn alt" id="manual">اكتب الرقم بنفسي</button>
@@ -98,7 +104,7 @@ const OPTS=[['min','دقايق بس','لو الداتا مقفولة بيتحو�
 const $=i=>document.getElementById(i);
 let co=null,pre='',digits='';
 
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+id));window.scrollTo(0,0)}
+function show(id){if(id!=='scan')stopLive();document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+id));window.scrollTo(0,0)}
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
 
 $('cos').innerHTML=Object.entries(COS).map(([k,v])=>`<button class="co" style="--c:${v.c}" data-k="${k}"><div class="logo" style="--c:${v.c}">${v.l}<img src="logos/${k}.png" alt="" onerror="this.remove()"></div>${v.n}</button>`).join('');
@@ -107,42 +113,71 @@ $('cos').onclick=e=>{const b=e.target.closest('.co');if(!b)return;co=COS[b.datas
  $('opts').innerHTML=OPTS.map(o=>`<button class="opt" style="--c:${co.c}" data-o="${o[0]}"><b>${o[1]}</b><span>${o[2]}</span></button>`).join('');
  document.documentElement.style.setProperty('--c',co.c);show('type')};
 $('opts').onclick=e=>{const b=e.target.closest('.opt');if(!b)return;pre=co.o[b.dataset.o];
- $('scanStatus').textContent='';show('scan')};
+ $('scanStatus').textContent='';show('scan');startLive()};
 
 $('camBtn').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('cam').click()}};
 $('manual').onclick=()=>toReview('');
 
 function toReview(d,msg){digits=d;$('num').value=d;render();$('rvStatus').textContent=msg||'';$('rvStatus').className='status'+(msg?' bad':'');show('review');if(!d)$('num').focus()}
 
+let wk=null,ready=false;
+function getWorker(){return wk||(wk=Tesseract.createWorker('eng',1,{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_fast'}).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}).catch(e=>{wk=null;throw e}))}
+async function prep(f){const b=await createImageBitmap(f);const k=Math.min(1,1100/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext('2d');x.drawImage(b,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
+if(typeof Tesseract!=='undefined')getWorker().catch(()=>{});
+let stream=null,live=false;
+function stopLive(){live=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('vf').style.display='none';$('startCam').style.display='none'}
+function crop(v){const r=v.getBoundingClientRect(),cw=r.width,ch=r.height,vw=v.videoWidth,vh=v.videoHeight,s=Math.max(cw/vw,ch/vh),ox=(vw*s-cw)/2,oy=(vh*s-ch)/2;const sx=(cw*.06+ox)/s,sy=(ch*.42+oy)/s,sw=cw*.88/s,sh=ch*.16/s,k=Math.min(1,900/sw);const c=document.createElement('canvas');c.width=Math.round(sw*k);c.height=Math.round(sh*k);const x=c.getContext('2d');x.drawImage(v,sx,sy,sw,sh,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
+async function startLive(){
+ const st=$('scanStatus');
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false})}
+ catch(_){st.className='status bad';st.textContent='مقدرتش أفتح الكاميرا. اسمح للمتصفح بالوصول للكاميرا ثم اضغط افتح الكاميرا، أو اختار صورة.';$('startCam').style.display='block';return}
+ const v=$('vid');v.srcObject=stream;try{await v.play()}catch(_){}
+ $('vf').style.display='block';$('startCam').style.display='none';live=true;
+ st.className='status';st.textContent=ready?'بدوّر على الرقم...':'بجهّز القارئ لأول مرة، مرة واحدة بس...';
+ let w;try{w=await getWorker()}catch(_){stopLive();st.className='status bad';st.textContent='القارئ مش متاح. اختار صورة أو اكتب الرقم بنفسك.';return}
+ let last='',n=0;
+ while(live){
+  let t='';try{t=(await w.recognize(crop(v))).data.text||''}catch(_){}
+  let cand='';
+  for(const ln of t.split('\n')){const d=ln.replace(/\D/g,'');if(d.length===16){cand=d;break}}
+  if(!cand){const d=t.replace(/\D/g,'');if(d.length===16)cand=d}
+  if(!live)return;
+  if(cand&&cand===last){toReview(cand);return}
+  last=cand;n++;
+  if(n===6){st.className='status bad';st.textContent='لسه مش لاقي 16 رقم. قرّب شوية وظبط الإضاءة من غير لمعة.'}
+  await new Promise(r=>setTimeout(r,120));
+ }
+}
+$('startCam').onclick=startLive;
 $('cam').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
  const st=$('scanStatus');st.className='status';st.textContent='بقرا الرقم من الصورة...';
  try{
-  if(typeof Tesseract==='undefined')throw 0;
+  if(typeof Tesseract==='undefined')throw 0;if(!ready)st.textContent='بجهّز القارئ لأول مرة، مرة واحدة بس...';const w=await getWorker();st.textContent='بقرا الرقم من الصورة...';const img=await prep(f);
   const r=await Promise.race([
-   Tesseract.recognize(f,'eng',{tessedit_char_whitelist:'0123456789 '}),
-   new Promise((_,j)=>setTimeout(j,25000))]);
+   w.recognize(img),
+   new Promise((_,j)=>setTimeout(j,30000))]);
   const t=(r.data.text||'').replace(/[^\d\s]/g,' ');
-  const m=(t.match(/\d(?:\s?\d){11,17}/g)||[]).map(s=>s.replace(/\s/g,'')).sort((a,b)=>Math.abs(a.length-14)-Math.abs(b.length-14));
+  const m=(t.match(/\d(?:\s?\d){13,19}/g)||[]).map(s=>s.replace(/\s/g,'')).sort((a,b)=>Math.abs(a.length-16)-Math.abs(b.length-16));
   if(!m.length)throw 0;
   toReview(m[0]);
  }catch(_){
-  toReview('','القراءة التلقائية مش شغالة في النسخة التجريبية دي. اكتب الرقم من الكارت وراجعه.');
+  toReview('','معرفتش أقرا الرقم من الصورة. صوّر تاني من قرب وإضاءة أحسن، أو اكتب الرقم من الكارت.');
  }
  e.target.value='';
 };
 
 function render(){
  const g=digits.match(/.{1,4}/g)||[];
- $('digits').innerHTML=g.length?g.map(x=>`<div class="grp">${x}</div>`).join(''):'<div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">00</div>';
+ $('digits').innerHTML=g.length?g.map(x=>`<div class="grp">${x}</div>`).join(''):'<div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div>';
  const n=digits.length,s=$('rvStatus');
  const full=pre+digits+'#';
  $('full').textContent=n?full:pre+'...#';
- const ok=n>=14&&n<=16;
+ const ok=n===16;
  $('call').setAttribute('aria-disabled',ok?'false':'true');
  $('call').href=ok?'tel:'+encodeURIComponent(full):'#';
- if(n&&n!==14){s.className='status bad';s.textContent=n<14?`الرقم ${n} خانة، ناقص ${14-n}. راجع الكارت.`:`الرقم ${n} خانة، أكتر من 14. راجع الكارت.`}
- else if(n===14){s.className='status ok';s.textContent='14 خانة، تمام. اتأكد إنه مطابق للكارت.'}
+ if(n&&n!==16){s.className='status bad';s.textContent=n<16?`الرقم ${n} خانة، ناقص ${16-n}. راجع الكارت.`:`الرقم ${n} خانة، أكتر من 16. راجع الكارت.`}
+ else if(n===16){s.className='status ok';s.textContent='16 خانة، تمام. اتأكد إنه مطابق للكارت.'}
 }
 $('num').oninput=e=>{digits=e.target.value.replace(/\D/g,'').slice(0,16);e.target.value=digits;render()};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(pre+digits+'#');$('copy').textContent='تم النسخ'}catch(_){$('copy').textContent='انسخ من الخانة اللي فوق'}setTimeout(()=>$('copy').textContent='انسخ الكود',1800)};
