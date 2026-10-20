@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>شحن بضغطة</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#0E1A2B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="شحن بضغطة">
 <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#EDF1F5;--surface:#fff;--ink:#0E1A2B;--mute:#5B6878;--line:#D5DCE5;--accent:#0E1A2B;--onaccent:#fff;--warn:#B45309;--ok:#0F7B4B;
@@ -183,5 +189,6 @@ $('num').oninput=e=>{digits=e.target.value.replace(/\D/g,'').slice(0,16);e.targe
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(pre+digits+'#');$('copy').textContent='تم النسخ'}catch(_){$('copy').textContent='انسخ من الخانة اللي فوق'}setTimeout(()=>$('copy').textContent='انسخ الكود',1800)};
 render();
 </script>
+<script>if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})</script>
 </body>
 </html>
