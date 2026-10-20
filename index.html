@@ -79,7 +79,7 @@ input.num:focus{outline:none;border-color:var(--c)}
   <div class="vf" id="vf" style="display:none"><video id="vid" playsinline muted></video><div class="frame"></div><div class="hint">حط الـ 16 رقم جوه المستطيل</div></div>
   <button class="btn" id="startCam" style="display:none">افتح الكاميرا</button>
   <label class="btn alt" for="cam" id="camBtn" tabindex="0">اختار صورة من الجهاز</label>
-  <input id="cam" type="file" accept="image/*" capture="environment" hidden>
+  <input id="cam" type="file" accept="image/*" hidden>
   <div class="status" id="scanStatus"></div>
   <button class="btn alt" id="manual">اكتب الرقم بنفسي</button>
 </section>
@@ -126,8 +126,8 @@ $('manual').onclick=()=>toReview('');
 
 function toReview(d,msg){digits=d;$('num').value=d;render();$('rvStatus').textContent=msg||'';$('rvStatus').className='status'+(msg?' bad':'');show('review');if(!d)$('num').focus()}
 
-let wk=null,ready=false;
-function getWorker(){return wk||(wk=Tesseract.createWorker('eng',1,{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_fast'}).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}).catch(e=>{wk=null;throw e}))}
+let wk=null,ready=false,prog='',lastErr=null;
+function getWorker(){return wk||(wk=Promise.race([Tesseract.createWorker('eng',1,{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_fast',logger:m=>{prog=(m.status||'')+' '+Math.round((m.progress||0)*100)+'%'}}).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),45000))]).catch(e=>{wk=null;lastErr=e;throw e}))}
 async function prep(f){const b=await createImageBitmap(f);const k=Math.min(1,1100/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext('2d');x.drawImage(b,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
 if(typeof Tesseract!=='undefined')getWorker().catch(()=>{});
 let stream=null,live=false;
@@ -140,7 +140,7 @@ async function startLive(){
  const v=$('vid');v.srcObject=stream;try{await v.play()}catch(_){}
  $('vf').style.display='block';$('startCam').style.display='none';live=true;
  st.className='status';st.textContent=ready?'بدوّر على الرقم...':'بجهّز القارئ لأول مرة، مرة واحدة بس...';
- let w;try{w=await getWorker()}catch(_){stopLive();st.className='status bad';st.textContent='القارئ مش متاح. اختار صورة أو اكتب الرقم بنفسك.';return}
+ let w;const tk=setInterval(()=>{if(!ready&&prog)st.textContent='بجهّز القارئ... '+prog},500);try{w=await getWorker();clearInterval(tk)}catch(_){clearInterval(tk);stopLive();$('startCam').style.display='block';st.className='status bad';st.textContent='القارئ مش متاح ('+(lastErr&&lastErr.message||'خطأ')+'). اضغط افتح الكاميرا لمحاولة تانية، أو اكتب الرقم بنفسك.';return}
  let last='',n=0;
  while(live){
   let t='';try{t=(await w.recognize(crop(v))).data.text||''}catch(_){}
