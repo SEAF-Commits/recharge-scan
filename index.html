@@ -98,7 +98,7 @@ input.num:focus{outline:none;border-color:var(--c)}
 
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="tesseract/tesseract.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';document.head.appendChild(s)"></script>
 <script>
 const COS={
  vf:{n:'فودافون',l:'V',c:'#E60000',o:{min:'*858*1*',net:'*858*2*',both:'*858*1*'}},
@@ -126,8 +126,11 @@ $('manual').onclick=()=>toReview('');
 
 function toReview(d,msg){digits=d;$('num').value=d;render();$('rvStatus').textContent=msg||'';$('rvStatus').className='status'+(msg?' bad':'');show('review');if(!d)$('num').focus()}
 
+const TB=new URL('tesseract',location.href).href;
+const LOCAL=fetch(TB+'/eng.traineddata.gz',{method:'HEAD'}).then(r=>r.ok).catch(()=>false);
+const LOCALOPTS={workerPath:TB+'/worker.min.js',corePath:TB,langPath:TB};
 let wk=null,ready=false,prog='',lastErr=null;
-function getWorker(){return wk||(wk=Promise.race([Tesseract.createWorker('eng',1,{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_fast',logger:m=>{prog=(m.status||'')+' '+Math.round((m.progress||0)*100)+'%'}}).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),45000))]).catch(e=>{wk=null;lastErr=e;throw e}))}
+function getWorker(){return wk||(wk=Promise.race([LOCAL.then(L=>Tesseract.createWorker('eng',1,{...(L?LOCALOPTS:{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_fast'}),logger:m=>{prog=(m.status||'')+' '+Math.round((m.progress||0)*100)+'%'}})).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),90000))]).catch(e=>{wk=null;lastErr=new Error((e&&e.message||'error')+' | '+(prog||'no-progress'));throw e}))}
 async function prep(f){const b=await createImageBitmap(f);const k=Math.min(1,1100/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext('2d');x.drawImage(b,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
 if(typeof Tesseract!=='undefined')getWorker().catch(()=>{});
 let stream=null,live=false;
