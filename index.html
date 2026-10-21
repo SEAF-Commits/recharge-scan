@@ -42,6 +42,10 @@ p{margin:0;color:var(--mute)}
 .digits{direction:ltr;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:18px 0 8px;min-height:56px}
 .grp{font-variant-numeric:tabular-nums;font-size:30px;font-weight:700;letter-spacing:3px;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:6px 12px}
 .grp.empty{color:var(--line)}
+.wk{color:#E11D48;border-bottom:3px solid #E11D48}
+.bx{position:absolute;border:2px solid;border-radius:4px}
+.bx.g{border-color:#22C55E;background:rgba(34,197,94,.2)}
+.bx.r{border-color:#EF4444;background:rgba(239,68,68,.25)}
 input.num{width:100%;font:inherit;font-size:22px;direction:ltr;text-align:center;padding:14px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);letter-spacing:2px}
 input.num:focus{outline:none;border-color:var(--c)}
 .status{margin-top:10px;font-size:15px;min-height:24px}
@@ -76,8 +80,9 @@ input.num:focus{outline:none;border-color:var(--c)}
   <button class="back" data-go="type">← رجوع</button>
   <h2>صوّر الكارت</h2>
   <p>قرّب الكاميرا من الرقم، وخلّي الإضاءة كويسة من غير لمعة.</p>
-  <div class="vf" id="vf" style="display:none"><video id="vid" playsinline muted></video><div class="frame"></div><div class="hint">حط الـ 16 رقم جوه المستطيل</div><button id="torchBtn" type="button" style="display:none;position:absolute;left:10px;top:10px;border:0;border-radius:20px;padding:8px 14px;font:inherit;font-size:14px;background:rgba(255,255,255,.9);color:#0E1A2B;cursor:pointer">💡 فلاش: مقفول</button></div>
+  <div class="vf" id="vf" style="display:none"><video id="vid" playsinline muted></video><div class="frame"></div><div id="ov" style="position:absolute;left:6%;right:6%;top:42%;height:16%;pointer-events:none"></div><div class="hint">حط الـ 16 رقم جوه المستطيل</div><button id="torchBtn" type="button" style="display:none;position:absolute;left:10px;top:10px;border:0;border-radius:20px;padding:8px 14px;font:inherit;font-size:14px;background:rgba(255,255,255,.9);color:#0E1A2B;cursor:pointer">💡 فلاش: مقفول</button></div>
   <button class="btn" id="startCam" style="display:none">افتح الكاميرا</button>
+  <button class="btn alt" id="goBtn" style="display:none">كمّل بالأرقام الحالية (راجع الأحمر)</button>
   <label class="btn alt" for="cam" id="camBtn" tabindex="0">اختار صورة من الجهاز</label>
   <input id="cam" type="file" accept="image/*" hidden>
   <div class="status" id="scanStatus"></div>
@@ -124,24 +129,24 @@ $('opts').onclick=e=>{const b=e.target.closest('.opt');if(!b)return;pre=co.o[b.d
 $('camBtn').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('cam').click()}};
 $('manual').onclick=()=>toReview('');
 
-function toReview(d,msg){digits=d;$('num').value=d;render();$('rvStatus').textContent=msg||'';$('rvStatus').className='status'+(msg?' bad':'');show('review');if(!d)$('num').focus()}
+function toReview(d,msg,wk2){digits=d;weak=new Set(wk2||[]);if(!msg&&weak.size)msg='الأرقام الملوّنة بالأحمر القارئ مش متأكد منها. قارنها بالكارت كويس.';$('num').value=d;render();$('rvStatus').textContent=msg||'';$('rvStatus').className='status'+(msg?' bad':'');show('review');if(!d)$('num').focus()}
 
 const TB=new URL('tesseract',location.href).href;
 const LOCAL=fetch(TB+'/eng.traineddata.gz',{method:'HEAD'}).then(r=>r.ok).catch(()=>false);
 const LOCALOPTS={workerPath:TB+'/worker.min.js',corePath:TB,langPath:TB};
 let wk=null,ready=false,prog='',lastErr=null;
-function getWorker(){return wk||(wk=Promise.race([LOCAL.then(L=>Tesseract.createWorker('eng',1,{...(L?LOCALOPTS:{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_fast'}),logger:m=>{prog=(m.status||'')+' '+Math.round((m.progress||0)*100)+'%'}})).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),90000))]).catch(e=>{wk=null;lastErr=new Error((e&&e.message||'error')+' | '+(prog||'no-progress'));throw e}))}
+function getWorker(){return wk||(wk=Promise.race([LOCAL.then(L=>Tesseract.createWorker('eng',1,{...(L?LOCALOPTS:{langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int'}),logger:m=>{prog=(m.status||'')+' '+Math.round((m.progress||0)*100)+'%'}})).then(async w=>{await w.setParameters({tessedit_char_whitelist:'0123456789 ',tessedit_pageseg_mode:'6'});ready=true;return w}),new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),90000))]).catch(e=>{wk=null;lastErr=new Error((e&&e.message||'error')+' | '+(prog||'no-progress'));throw e}))}
 async function prep(f){const b=await createImageBitmap(f);const k=Math.min(1,1100/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext('2d');x.drawImage(b,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=g}x.putImageData(d,0,0);return c}
 if(typeof Tesseract!=='undefined')getWorker().catch(()=>{});
-let stream=null,live=false;
-function stopLive(){live=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('vf').style.display='none';$('startCam').style.display='none'}
-function flattenData(p,W,H,inv){
+let stream=null,live=false,weak=new Set(),curBest=null;
+function stopLive(){live=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('vf').style.display='none';$('startCam').style.display='none';$('ov').innerHTML='';$('goBtn').style.display='none'}
+function flattenData(p,W,H,inv,T=70){
  const N=W*H,g=new Float32Array(N);
  for(let i=0,j=0;j<N;i+=4,j++){const v=.299*p[i]+.587*p[i+1]+.114*p[i+2];g[j]=inv?255-v:v}
  const W1=W+1,I=new Float64Array(W1*(H+1));
  for(let y=0;y<H;y++){let s=0;for(let x=0;x<W;x++){s+=g[y*W+x];I[(y+1)*W1+x+1]=I[y*W1+x+1]+s}}
  const r=Math.max(8,Math.round(H*.35));
- for(let y=0;y<H;y++){const y0=Math.max(0,y-r),y1=Math.min(H,y+r+1);for(let x=0;x<W;x++){const x0=Math.max(0,x-r),x1=Math.min(W,x+r+1);const m=(I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0])/((x1-x0)*(y1-y0));let n=g[y*W+x]/(m*1.08+1)*255;if(n>255)n=255;n=(n-70)*1.645;const o=n<0?0:n>255?255:n,k=(y*W+x)*4;p[k]=p[k+1]=p[k+2]=o}}
+ for(let y=0;y<H;y++){const y0=Math.max(0,y-r),y1=Math.min(H,y+r+1);for(let x=0;x<W;x++){const x0=Math.max(0,x-r),x1=Math.min(W,x+r+1);const m=(I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0])/((x1-x0)*(y1-y0));let n=g[y*W+x]/(m*1.08+1)*255;if(n>255)n=255;n=(n-T)*1.645;const o=n<0?0:n>255?255:n,k=(y*W+x)*4;p[k]=p[k+1]=p[k+2]=o}}
 }
 function vote(h){
  const cnt={};for(const c of h){cnt[c]=(cnt[c]||0)+1;if(cnt[c]>=2)return c}
@@ -151,7 +156,13 @@ function vote(h){
  return out;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function crop(v,inv){const r=v.getBoundingClientRect(),cw=r.width,ch=r.height,vw=v.videoWidth,vh=v.videoHeight,s=Math.max(cw/vw,ch/vh),ox=(vw*s-cw)/2,oy=(vh*s-ch)/2;const sx=(cw*.06+ox)/s,sy=(ch*.42+oy)/s,sw=cw*.88/s,sh=ch*.16/s,k=Math.min(2,1000/sw);const c=document.createElement('canvas');c.width=Math.round(sw*k);c.height=Math.round(sh*k);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,sx,sy,sw,sh,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height);flattenData(d.data,c.width,c.height,inv);x.putImageData(d,0,0);return c}
+const VAR=[[800,70],[1100,95],[1500,50]];
+const CONF=85; // أقل درجة ثقة عشان الرقم يتحسب مؤكد (0-100)
+function readSyms(d){
+ const gs=(d.lines&&d.lines.length)?d.lines.map(l=>[].concat(...(l.words||[]).map(w=>w.symbols||[]))):[d.symbols||[]];
+ for(const g of gs){const ds=g.filter(x=>/^\d$/.test(x.text)&&x.bbox);if(ds.length===16)return{c:ds.map(x=>x.text).join(''),sy:ds.map(x=>({cf:x.confidence,b:x.bbox}))}}
+ return null}
+function crop(v,inv,W=1000,T=70){const r=v.getBoundingClientRect(),cw=r.width,ch=r.height,vw=v.videoWidth,vh=v.videoHeight,s=Math.max(cw/vw,ch/vh),ox=(vw*s-cw)/2,oy=(vh*s-ch)/2;const sx=(cw*.06+ox)/s,sy=(ch*.42+oy)/s,sw=cw*.88/s,sh=ch*.16/s,k=Math.min(2,W/sw);const c=document.createElement('canvas');c.width=Math.round(sw*k);c.height=Math.round(sh*k);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,sx,sy,sw,sh,0,0,c.width,c.height);const d=x.getImageData(0,0,c.width,c.height);flattenData(d.data,c.width,c.height,inv,T);x.putImageData(d,0,0);return c}
 const AUTOFLASH=false; // غيّرها لـ true لو عايز الفلاش يفتح لوحده
 let torchOn=false;
 async function setTorch(on){try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:on}]});torchOn=on;$('torchBtn').textContent=on?'💡 فلاش: شغال':'💡 فلاش: مقفول';return true}catch(_){return false}}
@@ -168,24 +179,42 @@ async function startLive(){
  let w;const tk=setInterval(()=>{if(!ready&&prog)st.textContent='بجهّز القارئ... '+prog},500);try{w=await getWorker();clearInterval(tk);await w.setParameters({tessedit_pageseg_mode:'7'})}catch(_){clearInterval(tk);stopLive();$('startCam').style.display='block';st.className='status bad';st.textContent='القارئ مش متاح ('+(lastErr&&lastErr.message||'خطأ')+'). اضغط افتح الكاميرا لمحاولة تانية، أو اكتب الرقم بنفسك.';return}
  if(!live)return;
  st.className='status';st.textContent='بدوّر على الرقم...';
- let hist=[],n=0;
+ let obs=Array.from({length:16},()=>[]),n=0,firstN=-1;const ov=$('ov');curBest=null;
  while(live){
   if(!v.videoWidth){await sleep(80);continue}
-  let t='';try{t=(await w.recognize(crop(v,n>=8&&n%2===1))).data.text||''}catch(_){}
+  let cv=null,S=null,t='';
+  try{cv=crop(v,n>=8&&n%2===1,VAR[n%3][0],VAR[n%3][1]);const rr=await w.recognize(cv);t=rr.data.text||'';S=readSyms(rr.data)}catch(_){}
   if(!live)return;
-  let cand='';
-  for(const ln of t.split('\n')){const d=ln.replace(/\D/g,'');if(d.length===16){cand=d;break}}
-  if(!cand){const d=t.replace(/\D/g,'');if(d.length===16)cand=d}
-  let over=0;if(!cand){for(const ln of t.split('\n')){const d=ln.replace(/\D/g,'');if(d.length>16&&d.length>over)over=d.length}}
   n++;
-  hist=hist.filter(o=>n-o.n<=8);
-  if(cand){hist.push({c:cand,n});const fin=vote(hist.map(o=>o.c));if(fin){toReview(fin);return}st.className='status';st.textContent='لقيت رقم، ثبّت الكاميرا لحظة...'}
-  else if(over){st.className='status bad';st.textContent='لقيت '+over+' رقم، والكارت لازم يكون 16 رقم بس. حط رقم الكارت لوحده جوه المستطيل.'}
-  else if(n>=6&&!hist.length){st.className='status bad';st.textContent='لسه مش لاقي 16 رقم. قرّب شوية وظبط الإضاءة من غير لمعة.'}
+  let cand='';
+  if(S)cand=S.c;else{for(const ln of t.split('\n')){const d=ln.replace(/\D/g,'');if(d.length===16){cand=d;break}}if(!cand){const d=t.replace(/\D/g,'');if(d.length===16)cand=d}}
+  if(!cand){
+   ov.innerHTML='';
+   let over=0;for(const ln of t.split('\n')){const d=ln.replace(/\D/g,'');if(d.length>over)over=d.length}
+   if(over>16){st.className='status bad';st.textContent='لقيت '+over+' رقم، والكارت لازم يكون 16 رقم بس. حط رقم الكارت لوحده جوه المستطيل.'}
+   else if(n>=6&&firstN<0){st.className='status bad';st.textContent='لسه مش لاقي 16 رقم. قرّب شوية وظبط الإضاءة من غير لمعة.'}
+   await sleep(30);continue;
+  }
+  if(firstN<0)firstN=n;
+  const fin=[],ok=[];
+  for(let i=0;i<16;i++){
+   obs[i].push({d:cand[i],cf:S?S.sy[i].cf:100,n});obs[i]=obs[i].filter(o=>n-o.n<=6);
+   const m={};for(const o of obs[i])if(o.cf>=CONF)m[o.d]=(m[o.d]||0)+1;
+   const e=Object.entries(m).sort((x,y)=>y[1]-x[1]);
+   const good=e.length>0&&e[0][1]>=2&&(!e[1]||e[1][1]<e[0][1])&&e[0][0]===cand[i];
+   fin.push(good?e[0][0]:cand[i]);ok.push(good);
+  }
+  ov.innerHTML=S?S.sy.map((s2,i)=>{const b2=s2.b;return '<div class="bx '+(ok[i]?'g':'r')+'" style="left:'+(b2.x0/cv.width*100)+'%;top:'+(b2.y0/cv.height*100)+'%;width:'+((b2.x1-b2.x0)/cv.width*100)+'%;height:'+((b2.y1-b2.y0)/cv.height*100)+'%"></div>'}).join(''):'';
+  const good=ok.filter(Boolean).length,red=[];ok.forEach((x,i)=>{if(!x)red.push(i)});
+  curBest={c:fin.join(''),red};
+  $('goBtn').style.display=(n-firstN>=25)?'block':'none';
+  if(good===16){st.className='status ok';st.textContent='كل الأرقام مؤكدة ✓';await sleep(700);if(!live)return;toReview(curBest.c,'',[]);return}
+  st.className='status';st.textContent=good+' من 16 رقم مؤكدين. الأحمر غير مؤكد: غيّر الزاوية أو قرّب لحد ما كلهم يبقوا أخضر.';
   await sleep(30);
  }
 }
 $('startCam').onclick=startLive;
+$('goBtn').onclick=()=>{if(curBest)toReview(curBest.c,'',curBest.red)};
 $('cam').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;stopLive();
  const st=$('scanStatus');st.className='status';st.textContent='بقرا الرقم من الصورة...';
@@ -206,7 +235,7 @@ $('cam').onchange=async e=>{
 
 function render(){
  const g=digits.match(/.{1,4}/g)||[];
- $('digits').innerHTML=g.length?g.map(x=>`<div class="grp">${x}</div>`).join(''):'<div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div>';
+ $('digits').innerHTML=g.length?g.map((x,gi)=>`<div class="grp">${x.split('').map((ch,j)=>weak.has(gi*4+j)?'<span class="wk">'+ch+'</span>':ch).join('')}</div>`).join(''):'<div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div><div class="grp empty">0000</div>';
  const n=digits.length,s=$('rvStatus');
  const full=pre+digits+'#';
  $('full').textContent=n?full:pre+'...#';
@@ -216,7 +245,7 @@ function render(){
  if(n&&n!==16){s.className='status bad';s.textContent=n<16?`الرقم ${n} خانة، ناقص ${16-n}. راجع الكارت.`:`الرقم ${n} خانة، أكتر من 16. راجع الكارت.`}
  else if(n===16){s.className='status ok';s.textContent='16 خانة، تمام. اتأكد إنه مطابق للكارت.'}
 }
-$('num').oninput=e=>{const raw=e.target.value.replace(/\D/g,'');digits=raw.slice(0,16);e.target.value=digits;render();if(raw.length>16){const s=$('rvStatus');s.className='status bad';s.textContent='الكارت 16 رقم بس، اتجاهلت الأرقام الزيادة ('+raw.length+' رقم).'}};
+$('num').oninput=e=>{weak=new Set();const raw=e.target.value.replace(/\D/g,'');digits=raw.slice(0,16);e.target.value=digits;render();if(raw.length>16){const s=$('rvStatus');s.className='status bad';s.textContent='الكارت 16 رقم بس، اتجاهلت الأرقام الزيادة ('+raw.length+' رقم).'}};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(pre+digits+'#');$('copy').textContent='تم النسخ'}catch(_){$('copy').textContent='انسخ من الخانة اللي فوق'}setTimeout(()=>$('copy').textContent='انسخ الكود',1800)};
 render();
 </script>
